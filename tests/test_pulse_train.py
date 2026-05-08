@@ -36,3 +36,54 @@ def test_pulse_generator_validates_arguments() -> None:
 
     with pytest.raises(ValueError):
         generate_pulse_train(10_000, 0.1, 50, 0.001, dropout=1.5)
+
+
+def test_generate_pulse_train_clock_offset_shifts_all_arrivals() -> None:
+    _, _, nominal_arrivals = generate_pulse_train(
+        sample_rate=100_000,
+        duration=0.2,
+        pulse_rate=20,
+        pulse_width=0.001,
+    )
+    _, _, offset_arrivals = generate_pulse_train(
+        sample_rate=100_000,
+        duration=0.2,
+        pulse_rate=20,
+        pulse_width=0.001,
+        clock_offset=0.007,
+    )
+
+    assert offset_arrivals.size == nominal_arrivals.size
+    np.testing.assert_allclose(
+        offset_arrivals - nominal_arrivals,
+        0.007,
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+def test_generate_pulse_train_clock_drift_progressively_changes_arrivals() -> None:
+    _, _, nominal_arrivals = generate_pulse_train(
+        sample_rate=100_000,
+        duration=0.5,
+        pulse_rate=10,
+        pulse_width=0.001,
+    )
+    _, _, drifted_arrivals = generate_pulse_train(
+        sample_rate=100_000,
+        duration=0.5,
+        pulse_rate=10,
+        pulse_width=0.001,
+        clock_drift=0.1,
+    )
+
+    arrival_delta = drifted_arrivals - nominal_arrivals
+
+    assert drifted_arrivals.size == nominal_arrivals.size
+    assert np.all(np.diff(arrival_delta) > 0.0)
+    np.testing.assert_allclose(
+        arrival_delta,
+        nominal_arrivals * 0.1,
+        rtol=0.0,
+        atol=1e-12,
+    )

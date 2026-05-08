@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compact_timing_receiver"
+version = "0.1.0"
+description = "Synthetic pulse-train generation and timing estimators for compact optical/RF receiver experiments."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools]
+packages = ["compact_timing_receiver"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

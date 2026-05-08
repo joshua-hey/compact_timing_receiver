@@ -1,6 +1,20 @@
 # Compact Optical/RF Timing Receiver
 
-Compact Optical/RF Timing Receiver is a small Python toolkit for generating synthetic pulse trains, adding simple signal impairments, and estimating pulse arrival times with threshold and matched-filter methods. The goal is to provide a readable, testable Phase 1 foundation for timing-recovery experiments without hardware integration or receiver-state modeling.
+Compact Optical/RF Timing Receiver is a Phase 1 prototype: a small Python toolkit for generating synthetic pulse trains, adding simple signal impairments, and estimating pulse arrival times with threshold and matched-filter methods.
+
+The goal of this first phase is to provide a readable, testable foundation for timing-recovery experiments. It is intended for simulation, algorithm exploration, and early validation only. It does not yet include hardware integration, calibrated RF/optical front-end models, clock-recovery loops, receiver-state modeling, or production-ready performance guarantees.
+
+## Project Status
+
+This repository is public as an early prototype. The current code is intentionally compact and focused on core timing-estimation behavior:
+
+- Synthetic pulse-train generation
+- Basic additive noise modeling
+- Threshold-based time-of-arrival estimation
+- Matched-filter time-of-arrival estimation
+- Unit tests for the Phase 1 estimator behavior
+
+Future phases may expand the receiver model, add more realistic impairments, and introduce hardware-facing workflows.
 
 ## Installation
 

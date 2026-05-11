@@ -10,25 +10,29 @@ from compact_timing_receiver.sweeps import run_white_noise_snr_sweep
 
 def main() -> None:
     results = run_white_noise_snr_sweep(
-        [30, 25, 20, 15, 10, 5],
-        trial_count=5,
+        [30, 25, 20, 15, 10, 5, 0],
+        trial_count=20,
+        pulse_count=20,
         base_seed=100,
     )
 
     print(
-        "snr_db  trial_count  mean_rms_error  mean_rms_error_samples  "
-        "mean_bias_error  mean_missed_count  mean_extra_count  max_rms_error"
+        "snr_db  trial_count  pulse_count  total_true_pulses  detection_rate  "
+        "missed_detection_rate  false_detections_per_100_pulses  "
+        "mean_rms_error_samples  mean_bias_error  p95_abs_error"
     )
     for row in results:
         print(
             f"{row['snr_db']:6.1f}  "
             f"{row['trial_count']:11d}  "
-            f"{row['mean_rms_error']:14.3e}  "
+            f"{row['pulse_count']:11d}  "
+            f"{row['total_true_pulses']:17d}  "
+            f"{row['detection_rate']:14.3f}  "
+            f"{row['missed_detection_rate']:21.3f}  "
+            f"{row['false_detections_per_100_pulses']:32.3f}  "
             f"{row['mean_rms_error_samples']:22.3f}  "
             f"{row['mean_bias_error']:15.3e}  "
-            f"{row['mean_missed_count']:17.3f}  "
-            f"{row['mean_extra_count']:16.3f}  "
-            f"{row['max_rms_error']:13.3e}"
+            f"{row['p95_abs_error']:13.3e}"
         )
 
 

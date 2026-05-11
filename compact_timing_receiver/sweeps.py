@@ -30,8 +30,9 @@ def run_white_noise_snr_sweep(
     *,
     trial_count: int = 1,
     base_seed: int = 0,
+    pulse_count: int = 20,
     sample_rate: float = 100_000,
-    duration: float = 0.12,
+    duration: float | None = None,
     pulse_rate: float = 50,
     pulse_width: float = 0.0012,
     amplitude: float = 1.0,
@@ -45,17 +46,23 @@ def run_white_noise_snr_sweep(
     snr_db_array = _validate_snr_values(snr_db_values)
     if trial_count < 1:
         raise ValueError("trial_count must be at least 1")
+    if pulse_count < 1:
+        raise ValueError("pulse_count must be at least 1")
+    if duration is None:
+        duration = (pulse_count + 1) / pulse_rate
     if match_tolerance is None:
         match_tolerance = 3.0 / sample_rate
 
     results: list[dict[str, Any]] = []
+    sample_period = 1.0 / sample_rate
 
     for snr_index, snr_db in enumerate(snr_db_array):
         rms_errors: list[float] = []
-        bias_errors: list[float] = []
         missed_counts: list[int] = []
         extra_counts: list[int] = []
         true_pulse_counts: list[int] = []
+        estimated_pulse_counts: list[int] = []
+        matched_errors: list[float] = []
 
         for trial_index in range(trial_count):
             trial_seed = base_seed + snr_index * trial_count + trial_index
@@ -88,27 +95,51 @@ def run_white_noise_snr_sweep(
             summary = summarize_timing_errors(timing_errors, missed_count, extra_count)
 
             rms_errors.append(float(summary["rms_error"]))
-            bias_errors.append(float(summary["mean_error"]))
             missed_counts.append(int(summary["missed_count"]))
             extra_counts.append(int(summary["extra_count"]))
             true_pulse_counts.append(int(true_arrival_times.size))
+            estimated_pulse_counts.append(int(estimated_arrival_times.size))
+            matched_errors.extend(float(error) for error in timing_errors)
 
         mean_rms_error = float(np.mean(rms_errors))
-        sample_period = 1.0 / sample_rate
+        total_true_pulses = int(np.sum(true_pulse_counts))
+        total_estimated_pulses = int(np.sum(estimated_pulse_counts))
+        total_missed_count = int(np.sum(missed_counts))
+        total_extra_count = int(np.sum(extra_counts))
+        matched_error_array = np.asarray(matched_errors, dtype=float)
+        if matched_error_array.size == 0:
+            mean_bias_error = float("nan")
+            p95_abs_error = float("nan")
+        else:
+            mean_bias_error = float(np.mean(matched_error_array))
+            p95_abs_error = float(np.percentile(np.abs(matched_error_array), 95.0))
 
         results.append(
             {
                 "estimator": "matched_filter",
                 "snr_db": float(snr_db),
                 "trial_count": int(trial_count),
+                "pulse_count": int(pulse_count),
                 "total_trials": int(trial_count),
-                "total_true_pulses": int(np.sum(true_pulse_counts)),
-                "mean_bias_error": float(np.mean(bias_errors)),
+                "total_true_pulses": total_true_pulses,
+                "total_estimated_pulses": total_estimated_pulses,
+                "total_missed_count": total_missed_count,
+                "total_extra_count": total_extra_count,
+                "detection_rate": float(
+                    (total_true_pulses - total_missed_count) / total_true_pulses
+                ),
+                "missed_detection_rate": float(total_missed_count / total_true_pulses),
+                "false_detections_per_trial": float(total_extra_count / trial_count),
+                "false_detections_per_100_pulses": float(
+                    100.0 * total_extra_count / total_true_pulses
+                ),
                 "mean_rms_error": mean_rms_error,
                 "mean_rms_error_samples": float(mean_rms_error / sample_period),
+                "max_rms_error": float(np.max(rms_errors)),
+                "mean_bias_error": mean_bias_error,
+                "p95_abs_error": p95_abs_error,
                 "mean_missed_count": float(np.mean(missed_counts)),
                 "mean_extra_count": float(np.mean(extra_counts)),
-                "max_rms_error": float(np.max(rms_errors)),
                 "max_missed_count": int(np.max(missed_counts)),
                 "max_extra_count": int(np.max(extra_counts)),
             }

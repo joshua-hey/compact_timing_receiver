@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from compact_timing_receiver.noise import (
     add_amplitude_fluctuation,
@@ -48,3 +49,26 @@ def test_quantize_adc_uses_expected_levels() -> None:
 
     expected = np.array([-1.0, -1.0 / 3.0, 1.0 / 3.0, 1.0])
     np.testing.assert_allclose(quantized, expected)
+
+
+def test_noise_functions_validate_parameters() -> None:
+    signal = np.ones(4)
+    t = np.linspace(0.0, 1.0, 4)
+
+    with pytest.raises(ValueError):
+        add_white_noise(signal, std=-0.1)
+
+    with pytest.raises(ValueError):
+        add_baseline_drift(t[:-1], signal, amplitude=0.1, frequency=1.0)
+
+    with pytest.raises(ValueError):
+        add_amplitude_fluctuation(signal, std=-0.1)
+
+    with pytest.raises(ValueError):
+        apply_saturation(signal, min_value=1.0, max_value=0.0)
+
+    with pytest.raises(ValueError):
+        quantize_adc(signal, bits=0, v_min=0.0, v_max=1.0)
+
+    with pytest.raises(ValueError):
+        quantize_adc(signal, bits=8, v_min=1.0, v_max=0.0)

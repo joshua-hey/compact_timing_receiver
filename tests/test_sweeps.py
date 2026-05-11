@@ -193,6 +193,7 @@ def test_white_noise_snr_sweep_timing_aggregates_ignore_no_match_trials(
     assert math.isfinite(result["mean_rms_error"])
     assert math.isfinite(result["mean_bias_error"])
     assert math.isfinite(result["p95_abs_error"])
+    assert math.isfinite(result["max_rms_error"])
 
 
 def test_white_noise_snr_sweep_timing_aggregates_are_nan_without_matches(
@@ -215,6 +216,7 @@ def test_white_noise_snr_sweep_timing_aggregates_are_nan_without_matches(
     assert math.isnan(result["mean_rms_error"])
     assert math.isnan(result["mean_bias_error"])
     assert math.isnan(result["p95_abs_error"])
+    assert math.isnan(result["max_rms_error"])
 
 
 def test_white_noise_snr_sweep_rejects_empty_snr_values() -> None:

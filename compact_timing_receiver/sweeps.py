@@ -77,7 +77,7 @@ def run_white_noise_snr_sweep(
                 baseline=baseline,
                 seed=trial_seed,
             )
-            # SNR uses full-waveform average signal power, not pulse-peak power.
+            # SNR uses full-waveform average signal power, including any baseline.
             signal_power = float(np.mean(clean_signal**2))
             noise_power = signal_power / (10.0 ** (float(snr_db) / 10.0))
             noise_std = float(np.sqrt(noise_power))
@@ -117,6 +117,12 @@ def run_white_noise_snr_sweep(
             mean_rms_error = float(np.sqrt(np.mean(matched_error_array**2)))
             mean_bias_error = float(np.mean(matched_error_array))
             p95_abs_error = float(np.percentile(np.abs(matched_error_array), 95.0))
+        finite_rms_errors = np.asarray(rms_errors, dtype=float)
+        finite_rms_errors = finite_rms_errors[np.isfinite(finite_rms_errors)]
+        if finite_rms_errors.size == 0:
+            max_rms_error = float("nan")
+        else:
+            max_rms_error = float(np.max(finite_rms_errors))
 
         results.append(
             {
@@ -140,7 +146,7 @@ def run_white_noise_snr_sweep(
                 ),
                 "mean_rms_error": mean_rms_error,
                 "mean_rms_error_samples": float(mean_rms_error / sample_period),
-                "max_rms_error": float(np.max(rms_errors)),
+                "max_rms_error": max_rms_error,
                 "mean_bias_error": mean_bias_error,
                 "p95_abs_error": p95_abs_error,
                 "mean_missed_count": float(np.mean(missed_counts)),

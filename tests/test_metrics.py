@@ -21,6 +21,20 @@ def test_match_arrival_times_pairs_perfect_matches() -> None:
     np.testing.assert_array_equal(estimated_indices, np.array([0, 1, 2]))
 
 
+def test_match_arrival_times_uses_nearest_greedy_pairing() -> None:
+    true_times = np.array([0.0, 0.1])
+    estimated_times = np.array([0.06])
+
+    true_indices, estimated_indices = match_arrival_times(
+        true_times,
+        estimated_times,
+        tolerance=0.1,
+    )
+
+    np.testing.assert_array_equal(true_indices, np.array([1]))
+    np.testing.assert_array_equal(estimated_indices, np.array([0]))
+
+
 def test_compute_timing_errors_reports_early_and_late_estimates() -> None:
     true_times = np.array([0.1, 0.2, 0.3])
     estimated_times = np.array([0.099, 0.202, 0.3])

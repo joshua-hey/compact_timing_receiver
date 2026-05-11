@@ -20,6 +20,8 @@ def _validate_snr_values(snr_db_values: Sequence[float]) -> np.ndarray:
     values = np.asarray(list(snr_db_values), dtype=float)
     if values.ndim != 1:
         raise ValueError("snr_db_values must be one-dimensional")
+    if values.size == 0:
+        raise ValueError("snr_db_values must not be empty")
     if not np.all(np.isfinite(values)):
         raise ValueError("snr_db_values must contain only finite values")
     return values
@@ -75,6 +77,7 @@ def run_white_noise_snr_sweep(
                 baseline=baseline,
                 seed=trial_seed,
             )
+            # SNR uses full-waveform average signal power, not pulse-peak power.
             signal_power = float(np.mean(clean_signal**2))
             noise_power = signal_power / (10.0 ** (float(snr_db) / 10.0))
             noise_std = float(np.sqrt(noise_power))
@@ -101,16 +104,17 @@ def run_white_noise_snr_sweep(
             estimated_pulse_counts.append(int(estimated_arrival_times.size))
             matched_errors.extend(float(error) for error in timing_errors)
 
-        mean_rms_error = float(np.mean(rms_errors))
         total_true_pulses = int(np.sum(true_pulse_counts))
         total_estimated_pulses = int(np.sum(estimated_pulse_counts))
         total_missed_count = int(np.sum(missed_counts))
         total_extra_count = int(np.sum(extra_counts))
         matched_error_array = np.asarray(matched_errors, dtype=float)
         if matched_error_array.size == 0:
+            mean_rms_error = float("nan")
             mean_bias_error = float("nan")
             p95_abs_error = float("nan")
         else:
+            mean_rms_error = float(np.sqrt(np.mean(matched_error_array**2)))
             mean_bias_error = float(np.mean(matched_error_array))
             p95_abs_error = float(np.percentile(np.abs(matched_error_array), 95.0))
 
@@ -120,6 +124,7 @@ def run_white_noise_snr_sweep(
                 "snr_db": float(snr_db),
                 "trial_count": int(trial_count),
                 "pulse_count": int(pulse_count),
+                "requested_pulse_count": int(pulse_count),
                 "total_trials": int(trial_count),
                 "total_true_pulses": total_true_pulses,
                 "total_estimated_pulses": total_estimated_pulses,

@@ -17,7 +17,7 @@ def main() -> None:
     )
 
     print(
-        "snr_db  trial_count  pulse_count  total_true_pulses  detection_rate  "
+        "snr_db  trial_count  requested_pulse_count  total_true_pulses  detection_rate  "
         "missed_detection_rate  false_detections_per_100_pulses  "
         "mean_rms_error_samples  mean_bias_error  p95_abs_error"
     )
@@ -25,7 +25,7 @@ def main() -> None:
         print(
             f"{row['snr_db']:6.1f}  "
             f"{row['trial_count']:11d}  "
-            f"{row['pulse_count']:11d}  "
+            f"{row['requested_pulse_count']:21d}  "
             f"{row['total_true_pulses']:17d}  "
             f"{row['detection_rate']:14.3f}  "
             f"{row['missed_detection_rate']:21.3f}  "

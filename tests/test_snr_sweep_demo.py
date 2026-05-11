@@ -16,6 +16,7 @@ def test_snr_sweep_demo_script_runs_from_repository_root() -> None:
 
     output = completed.stdout
     assert "snr_db" in output
+    assert "requested_pulse_count" in output
     assert "detection_rate" in output
     assert "false_detections_per_100_pulses" in output
     assert "mean_rms_error_samples" in output

@@ -102,11 +102,13 @@ def summarize_timing_errors(
         mean_error = float("nan")
         mean_absolute_error = float("nan")
         rms_error = float("nan")
+        std_error = float("nan")
         max_absolute_error = float("nan")
     else:
         mean_error = float(np.mean(errors))
         mean_absolute_error = float(np.mean(np.abs(errors)))
         rms_error = float(np.sqrt(np.mean(errors**2)))
+        std_error = float(np.std(errors))
         max_absolute_error = float(np.max(np.abs(errors)))
 
     return {
@@ -116,6 +118,8 @@ def summarize_timing_errors(
         "mean_error": mean_error,
         "mean_absolute_error": mean_absolute_error,
         "rms_error": rms_error,
+        "std_error": std_error,
+        "max_abs_error": max_absolute_error,
         "max_absolute_error": max_absolute_error,
     }
 

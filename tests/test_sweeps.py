@@ -34,6 +34,7 @@ def test_white_noise_snr_sweep_result_fields_are_present() -> None:
         "trial_count",
         "pulse_count",
         "requested_pulse_count",
+        "off_grid",
         "total_trials",
         "total_true_pulses",
         "total_estimated_pulses",
@@ -63,6 +64,43 @@ def test_white_noise_snr_sweep_is_deterministic_for_same_base_seed() -> None:
         trial_count=2,
         pulse_count=5,
         base_seed=9,
+    )
+
+    assert first == second
+
+
+def test_white_noise_snr_sweep_off_grid_false_matches_default_behavior() -> None:
+    implicit = run_white_noise_snr_sweep(
+        [40.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=13,
+    )
+    explicit = run_white_noise_snr_sweep(
+        [40.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=13,
+        off_grid=False,
+    )
+
+    assert implicit == explicit
+
+
+def test_white_noise_snr_sweep_off_grid_true_is_deterministic() -> None:
+    first = run_white_noise_snr_sweep(
+        [40.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=13,
+        off_grid=True,
+    )
+    second = run_white_noise_snr_sweep(
+        [40.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=13,
+        off_grid=True,
     )
 
     assert first == second
@@ -131,6 +169,18 @@ def test_white_noise_snr_sweep_reports_requested_pulse_count() -> None:
     assert result["requested_pulse_count"] == 5
 
 
+def test_white_noise_snr_sweep_reports_off_grid_setting() -> None:
+    result = run_white_noise_snr_sweep(
+        [40.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=3,
+        off_grid=True,
+    )[0]
+
+    assert result["off_grid"] is True
+
+
 def test_white_noise_snr_sweep_detection_rates_are_bounded() -> None:
     result = run_white_noise_snr_sweep(
         [20.0],
@@ -152,6 +202,33 @@ def test_white_noise_snr_sweep_false_detection_rate_is_nonnegative() -> None:
     )[0]
 
     assert result["false_detections_per_100_pulses"] >= 0.0
+
+
+def test_high_snr_off_grid_sweep_has_finite_nonnegative_rms_error() -> None:
+    result = run_white_noise_snr_sweep(
+        [80.0],
+        trial_count=3,
+        pulse_count=5,
+        base_seed=17,
+        off_grid=True,
+    )[0]
+
+    assert math.isfinite(result["mean_rms_error"])
+    assert math.isfinite(result["mean_rms_error_samples"])
+    assert result["mean_rms_error"] >= 0.0
+    assert result["mean_rms_error_samples"] >= 0.0
+
+
+def test_high_snr_off_grid_sweep_has_nonzero_sample_error() -> None:
+    result = run_white_noise_snr_sweep(
+        [80.0],
+        trial_count=3,
+        pulse_count=5,
+        base_seed=17,
+        off_grid=True,
+    )[0]
+
+    assert result["mean_rms_error_samples"] > 0.0
 
 
 def test_white_noise_snr_sweep_detection_count_invariant() -> None:

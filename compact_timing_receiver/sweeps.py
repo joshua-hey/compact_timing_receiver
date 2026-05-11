@@ -39,6 +39,7 @@ def run_white_noise_snr_sweep(
     pulse_width: float = 0.0012,
     amplitude: float = 1.0,
     baseline: float = 0.0,
+    off_grid: bool = False,
     estimator_threshold: float | None = 0.2,
     estimator_refractory: float | None = 0.01,
     match_tolerance: float | None = None,
@@ -68,6 +69,12 @@ def run_white_noise_snr_sweep(
 
         for trial_index in range(trial_count):
             trial_seed = base_seed + snr_index * trial_count + trial_index
+            if off_grid:
+                clock_offset = float(
+                    np.random.default_rng(trial_seed).uniform(0.0, sample_period)
+                )
+            else:
+                clock_offset = 0.0
             t, clean_signal, true_arrival_times = generate_pulse_train(
                 sample_rate=sample_rate,
                 duration=duration,
@@ -75,6 +82,7 @@ def run_white_noise_snr_sweep(
                 pulse_width=pulse_width,
                 amplitude=amplitude,
                 baseline=baseline,
+                clock_offset=clock_offset,
                 seed=trial_seed,
             )
             # SNR uses full-waveform average signal power, including any baseline.
@@ -131,6 +139,7 @@ def run_white_noise_snr_sweep(
                 "trial_count": int(trial_count),
                 "pulse_count": int(pulse_count),
                 "requested_pulse_count": int(pulse_count),
+                "off_grid": bool(off_grid),
                 "total_trials": int(trial_count),
                 "total_true_pulses": total_true_pulses,
                 "total_estimated_pulses": total_estimated_pulses,

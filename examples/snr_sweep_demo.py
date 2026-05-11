@@ -13,6 +13,7 @@ def main() -> None:
         [30, 25, 20, 15, 10, 5, 0],
         trial_count=20,
         pulse_count=20,
+        off_grid=True,
         base_seed=100,
     )
 

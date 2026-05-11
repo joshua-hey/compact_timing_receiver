@@ -27,6 +27,28 @@ def _validate_snr_values(snr_db_values: Sequence[float]) -> np.ndarray:
     return values
 
 
+def _wilson_interval(success_count: int, total_count: int) -> tuple[float, float]:
+    if total_count == 0:
+        return float("nan"), float("nan")
+
+    z = 1.959963984540054
+    p_hat = success_count / total_count
+    denominator = 1.0 + z**2 / total_count
+    center = (p_hat + z**2 / (2.0 * total_count)) / denominator
+    half_width = (
+        z
+        * np.sqrt((p_hat * (1.0 - p_hat) + z**2 / (4.0 * total_count)) / total_count)
+        / denominator
+    )
+    low = float(max(0.0, center - half_width))
+    high = float(min(1.0, center + half_width))
+    if success_count == 0:
+        low = 0.0
+    if success_count == total_count:
+        high = 1.0
+    return low, high
+
+
 def run_white_noise_snr_sweep(
     snr_db_values: Sequence[float],
     *,
@@ -125,13 +147,25 @@ def run_white_noise_snr_sweep(
             mean_rms_error = float(np.sqrt(np.mean(matched_error_array**2)))
             mean_bias_error = float(np.mean(matched_error_array))
             p95_abs_error = float(np.percentile(np.abs(matched_error_array), 95.0))
+        mean_bias_error_samples = float(mean_bias_error / sample_period)
+        p95_abs_error_samples = float(p95_abs_error / sample_period)
         finite_rms_errors = np.asarray(rms_errors, dtype=float)
         finite_rms_errors = finite_rms_errors[np.isfinite(finite_rms_errors)]
         if finite_rms_errors.size == 0:
             max_rms_error = float("nan")
         else:
             max_rms_error = float(np.max(finite_rms_errors))
+        detected_count = total_true_pulses - total_missed_count
+        detection_rate_ci_low, detection_rate_ci_high = _wilson_interval(
+            detected_count,
+            total_true_pulses,
+        )
+        missed_detection_rate_ci_low, missed_detection_rate_ci_high = _wilson_interval(
+            total_missed_count,
+            total_true_pulses,
+        )
 
+        # This is an empirical extra-detection rate per true pulse, not formal Pfa.
         results.append(
             {
                 "estimator": "matched_filter",
@@ -148,7 +182,11 @@ def run_white_noise_snr_sweep(
                 "detection_rate": float(
                     (total_true_pulses - total_missed_count) / total_true_pulses
                 ),
+                "detection_rate_ci_low": detection_rate_ci_low,
+                "detection_rate_ci_high": detection_rate_ci_high,
                 "missed_detection_rate": float(total_missed_count / total_true_pulses),
+                "missed_detection_rate_ci_low": missed_detection_rate_ci_low,
+                "missed_detection_rate_ci_high": missed_detection_rate_ci_high,
                 "false_detections_per_trial": float(total_extra_count / trial_count),
                 "false_detections_per_100_pulses": float(
                     100.0 * total_extra_count / total_true_pulses
@@ -157,7 +195,11 @@ def run_white_noise_snr_sweep(
                 "mean_rms_error_samples": float(mean_rms_error / sample_period),
                 "max_rms_error": max_rms_error,
                 "mean_bias_error": mean_bias_error,
+                "mean_bias_error_s": mean_bias_error,
+                "mean_bias_error_samples": mean_bias_error_samples,
                 "p95_abs_error": p95_abs_error,
+                "p95_abs_error_s": p95_abs_error,
+                "p95_abs_error_samples": p95_abs_error_samples,
                 "mean_missed_count": float(np.mean(missed_counts)),
                 "mean_extra_count": float(np.mean(extra_counts)),
                 "max_missed_count": int(np.max(missed_counts)),

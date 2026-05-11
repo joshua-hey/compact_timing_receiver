@@ -41,14 +41,22 @@ def test_white_noise_snr_sweep_result_fields_are_present() -> None:
         "total_missed_count",
         "total_extra_count",
         "detection_rate",
+        "detection_rate_ci_low",
+        "detection_rate_ci_high",
         "missed_detection_rate",
+        "missed_detection_rate_ci_low",
+        "missed_detection_rate_ci_high",
         "false_detections_per_trial",
         "false_detections_per_100_pulses",
         "mean_rms_error",
         "mean_rms_error_samples",
         "max_rms_error",
         "mean_bias_error",
+        "mean_bias_error_s",
+        "mean_bias_error_samples",
         "p95_abs_error",
+        "p95_abs_error_s",
+        "p95_abs_error_samples",
     } <= set(result)
 
 
@@ -116,10 +124,14 @@ def test_matched_filter_snr_sweep_has_finite_rms_timing_error() -> None:
 
     for result in results:
         assert math.isfinite(result["mean_bias_error"])
+        assert math.isfinite(result["mean_bias_error_s"])
+        assert math.isfinite(result["mean_bias_error_samples"])
         assert math.isfinite(result["mean_rms_error"])
         assert math.isfinite(result["mean_rms_error_samples"])
         assert math.isfinite(result["max_rms_error"])
         assert math.isfinite(result["p95_abs_error"])
+        assert math.isfinite(result["p95_abs_error_s"])
+        assert math.isfinite(result["p95_abs_error_samples"])
 
 
 def test_high_snr_matched_filter_sweep_has_no_missed_or_extra_detections() -> None:
@@ -193,6 +205,20 @@ def test_white_noise_snr_sweep_detection_rates_are_bounded() -> None:
     assert 0.0 <= result["missed_detection_rate"] <= 1.0
 
 
+def test_white_noise_snr_sweep_rates_are_inside_confidence_intervals() -> None:
+    result = run_white_noise_snr_sweep(
+        [20.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=3,
+    )[0]
+
+    assert result["detection_rate_ci_low"] <= result["detection_rate"]
+    assert result["detection_rate"] <= result["detection_rate_ci_high"]
+    assert result["missed_detection_rate_ci_low"] <= result["missed_detection_rate"]
+    assert result["missed_detection_rate"] <= result["missed_detection_rate_ci_high"]
+
+
 def test_white_noise_snr_sweep_false_detection_rate_is_nonnegative() -> None:
     result = run_white_noise_snr_sweep(
         [20.0],
@@ -202,6 +228,30 @@ def test_white_noise_snr_sweep_false_detection_rate_is_nonnegative() -> None:
     )[0]
 
     assert result["false_detections_per_100_pulses"] >= 0.0
+
+
+def test_white_noise_snr_sweep_unit_specific_timing_fields_are_consistent() -> None:
+    sample_rate = 100_000
+    sample_period = 1.0 / sample_rate
+    result = run_white_noise_snr_sweep(
+        [40.0],
+        trial_count=2,
+        pulse_count=5,
+        base_seed=3,
+        sample_rate=sample_rate,
+        off_grid=True,
+    )[0]
+
+    if math.isfinite(result["mean_bias_error_s"]):
+        assert result["mean_bias_error"] == result["mean_bias_error_s"]
+        assert result["mean_bias_error_samples"] == pytest.approx(
+            result["mean_bias_error_s"] / sample_period,
+        )
+    if math.isfinite(result["p95_abs_error_s"]):
+        assert result["p95_abs_error"] == result["p95_abs_error_s"]
+        assert result["p95_abs_error_samples"] == pytest.approx(
+            result["p95_abs_error_s"] / sample_period,
+        )
 
 
 def test_high_snr_off_grid_sweep_has_finite_nonnegative_rms_error() -> None:

@@ -15,9 +15,13 @@ def test_snr_sweep_demo_script_runs_from_repository_root() -> None:
     )
 
     output = completed.stdout
+    assert "Off-grid AWGN SNR sweep" in output
     assert "snr_db" in output
     assert "requested_pulse_count" in output
     assert "detection_rate" in output
+    assert "detection_rate_ci_low" in output
+    assert "detection_rate_ci_high" in output
     assert "false_detections_per_100_pulses" in output
     assert "mean_rms_error_samples" in output
-    assert "p95_abs_error" in output
+    assert "mean_bias_error_samples" in output
+    assert "p95_abs_error_samples" in output

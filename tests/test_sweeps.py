@@ -48,8 +48,15 @@ def test_white_noise_snr_sweep_result_fields_are_present() -> None:
         "missed_detection_rate_ci_high",
         "false_detections_per_trial",
         "false_detections_per_100_pulses",
+        "search_window_samples",
+        "resolution_cells_per_trial",
+        "false_detection_rate_per_resolution_cell",
+        "false_detection_rate_ci_low",
+        "false_detection_rate_ci_high",
         "mean_rms_error",
         "mean_rms_error_samples",
+        "sigma_crlb_samples",
+        "efficiency",
         "max_rms_error",
         "mean_bias_error",
         "mean_bias_error_s",
@@ -128,6 +135,8 @@ def test_matched_filter_snr_sweep_has_finite_rms_timing_error() -> None:
         assert math.isfinite(result["mean_bias_error_samples"])
         assert math.isfinite(result["mean_rms_error"])
         assert math.isfinite(result["mean_rms_error_samples"])
+        assert math.isfinite(result["sigma_crlb_samples"])
+        assert math.isfinite(result["efficiency"])
         assert math.isfinite(result["max_rms_error"])
         assert math.isfinite(result["p95_abs_error"])
         assert math.isfinite(result["p95_abs_error_s"])
@@ -217,6 +226,12 @@ def test_white_noise_snr_sweep_rates_are_inside_confidence_intervals() -> None:
     assert result["detection_rate"] <= result["detection_rate_ci_high"]
     assert result["missed_detection_rate_ci_low"] <= result["missed_detection_rate"]
     assert result["missed_detection_rate"] <= result["missed_detection_rate_ci_high"]
+    assert result["false_detection_rate_ci_low"] <= (
+        result["false_detection_rate_per_resolution_cell"]
+    )
+    assert result["false_detection_rate_per_resolution_cell"] <= (
+        result["false_detection_rate_ci_high"]
+    )
 
 
 def test_white_noise_snr_sweep_false_detection_rate_is_nonnegative() -> None:
@@ -228,6 +243,7 @@ def test_white_noise_snr_sweep_false_detection_rate_is_nonnegative() -> None:
     )[0]
 
     assert result["false_detections_per_100_pulses"] >= 0.0
+    assert result["false_detection_rate_per_resolution_cell"] >= 0.0
 
 
 def test_white_noise_snr_sweep_unit_specific_timing_fields_are_consistent() -> None:

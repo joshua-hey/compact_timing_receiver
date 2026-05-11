@@ -7,6 +7,12 @@ from typing import Any
 
 import numpy as np
 
+from compact_timing_receiver.crlb import (
+    compute_rms_bandwidth_hz,
+    estimate_post_correlation_snr_linear,
+    resolution_cell_count,
+    sigma_crlb_seconds,
+)
 from compact_timing_receiver.estimators import estimate_toa_matched_filter
 from compact_timing_receiver.metrics import (
     compute_timing_errors,
@@ -80,6 +86,16 @@ def run_white_noise_snr_sweep(
 
     results: list[dict[str, Any]] = []
     sample_period = 1.0 / sample_rate
+    sample_count = int(np.floor(sample_rate * duration))
+    effective_refractory = (
+        estimator_refractory if estimator_refractory is not None else 2.0 * pulse_width
+    )
+    resolution_cells_per_trial = resolution_cell_count(
+        sample_count,
+        sample_rate,
+        effective_refractory,
+    )
+    beta_rms_hz = compute_rms_bandwidth_hz(sample_rate, pulse_width)
 
     for snr_index, snr_db in enumerate(snr_db_array):
         rms_errors: list[float] = []
@@ -88,6 +104,7 @@ def run_white_noise_snr_sweep(
         true_pulse_counts: list[int] = []
         estimated_pulse_counts: list[int] = []
         matched_errors: list[float] = []
+        post_correlation_snr_linear = float("nan")
 
         for trial_index in range(trial_count):
             trial_seed = base_seed + snr_index * trial_count + trial_index
@@ -112,6 +129,14 @@ def run_white_noise_snr_sweep(
             noise_power = signal_power / (10.0 ** (float(snr_db) / 10.0))
             noise_std = float(np.sqrt(noise_power))
             noisy_signal = add_white_noise(clean_signal, std=noise_std, seed=trial_seed)
+            if trial_index == 0:
+                post_correlation_snr_linear = estimate_post_correlation_snr_linear(
+                    clean_signal,
+                    true_arrival_times,
+                    sample_rate,
+                    pulse_width,
+                    noise_std,
+                )
 
             estimated_arrival_times = estimate_toa_matched_filter(
                 t,
@@ -164,6 +189,20 @@ def run_white_noise_snr_sweep(
             total_missed_count,
             total_true_pulses,
         )
+        sigma_crlb_s = sigma_crlb_seconds(beta_rms_hz, post_correlation_snr_linear)
+        sigma_crlb_samples = float(sigma_crlb_s / sample_period)
+        efficiency = float(mean_rms_error / sigma_crlb_s)
+        total_resolution_cells = int(trial_count * resolution_cells_per_trial)
+        false_detection_rate_per_resolution_cell = float(
+            total_extra_count / total_resolution_cells
+        )
+        (
+            false_detection_rate_ci_low,
+            false_detection_rate_ci_high,
+        ) = _wilson_interval(
+            min(total_extra_count, total_resolution_cells),
+            total_resolution_cells,
+        )
 
         # This is an empirical extra-detection rate per true pulse, not formal Pfa.
         results.append(
@@ -191,8 +230,17 @@ def run_white_noise_snr_sweep(
                 "false_detections_per_100_pulses": float(
                     100.0 * total_extra_count / total_true_pulses
                 ),
+                "search_window_samples": sample_count,
+                "resolution_cells_per_trial": resolution_cells_per_trial,
+                "false_detection_rate_per_resolution_cell": (
+                    false_detection_rate_per_resolution_cell
+                ),
+                "false_detection_rate_ci_low": false_detection_rate_ci_low,
+                "false_detection_rate_ci_high": false_detection_rate_ci_high,
                 "mean_rms_error": mean_rms_error,
                 "mean_rms_error_samples": float(mean_rms_error / sample_period),
+                "sigma_crlb_samples": sigma_crlb_samples,
+                "efficiency": efficiency,
                 "max_rms_error": max_rms_error,
                 "mean_bias_error": mean_bias_error,
                 "mean_bias_error_s": mean_bias_error,

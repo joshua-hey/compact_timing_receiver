@@ -1,6 +1,6 @@
 # Compact Optical/RF Timing Receiver
 
-Compact Optical/RF Timing Receiver is a Phase 1 prototype: a small Python toolkit for generating synthetic pulse trains, adding simple signal impairments, and estimating pulse arrival times with threshold and matched-filter methods.
+Compact Optical/RF Timing Receiver is a Phase 1 prototype: a small Python toolkit for generating synthetic pulse trains, adding simple signal impairments, estimating pulse arrival times with threshold and matched-filter methods, and characterizing timing performance under white-noise SNR sweeps.
 
 The goal of this first phase is to provide a readable, testable foundation for timing-recovery experiments. It is intended for simulation, algorithm exploration, and early validation only. It does not yet include hardware integration, calibrated RF/optical front-end models, clock-recovery loops, receiver-state modeling, or production-ready performance guarantees.
 
@@ -12,7 +12,10 @@ This repository is public as an early prototype. The current code is intentional
 - Basic additive noise modeling
 - Threshold-based time-of-arrival estimation
 - Matched-filter time-of-arrival estimation
-- Unit tests for the Phase 1 estimator behavior
+- Detection and timing-error metrics for estimator comparisons
+- White-noise SNR sweeps with empirical detection, false-detection, and error summaries
+- CRLB overlay, ROC, and high-SNR error-floor diagnostic artifacts
+- Unit tests for the simulator, estimators, metrics, sweeps, and characterization helpers
 
 Future phases may expand the receiver model, add more realistic impairments, and introduce hardware-facing workflows.
 
@@ -67,6 +70,27 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 ```
+
+## Characterization Workflows
+
+Run a compact off-grid AWGN SNR sweep:
+
+```bash
+python examples/snr_sweep_demo.py
+```
+
+Generate the current characterization artifacts:
+
+```bash
+python examples/crlb_characterization.py
+```
+
+This writes the current baseline artifacts in the repository root:
+
+- `snr_sweep_characterization.csv`: SNR sweep metrics, confidence intervals, CRLB samples, and estimator efficiency
+- `crlb_overlay.png`: empirical timing-error overlay against the CRLB curve
+- `roc_0db.png`: empirical ROC-style detection/false-detection curve at 0 dB input SNR
+- `floor_diagnosis.md`: notes on SNR convention, detector thresholding, and high-SNR error-floor diagnostics
 
 ## Tests
 

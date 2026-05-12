@@ -6,6 +6,8 @@ rising threshold crossings and Gaussian matched filtering.
 
 from __future__ import annotations
 
+from typing import Literal
+
 import numpy as np
 from scipy.signal import correlate, find_peaks
 
@@ -83,6 +85,7 @@ def estimate_toa_matched_filter(
     pulse_width: float,
     threshold: float | None = None,
     refractory: float | None = None,
+    interpolation: Literal["none", "parabolic"] = "none",
 ) -> np.ndarray:
     """Estimate arrival times using a Gaussian matched filter."""
 
@@ -93,6 +96,8 @@ def estimate_toa_matched_filter(
         raise ValueError("threshold must be finite when provided")
     if refractory is not None and (refractory < 0.0 or not np.isfinite(refractory)):
         raise ValueError("refractory must be finite and non-negative when provided")
+    if interpolation not in {"none", "parabolic"}:
+        raise ValueError('interpolation must be "none" or "parabolic"')
 
     dt = _sample_interval(time)
     sigma = pulse_width / 6.0
@@ -139,4 +144,30 @@ def estimate_toa_matched_filter(
     peaks, _ = find_peaks(filtered, height=peak_threshold, distance=distance)
 
     # Return array of times corresponding to the detected peaks.
-    return time[peaks].astype(float, copy=True)
+    if interpolation == "none":
+        return time[peaks].astype(float, copy=True)
+
+    sample_rate = 1.0 / dt
+    refined_times: list[float] = []
+    for peak in peaks:
+        if peak == 0 or peak == filtered.size - 1:
+            refined_times.append(float(time[peak]))
+            continue
+
+        y0 = float(filtered[peak - 1])
+        y1 = float(filtered[peak])
+        y2 = float(filtered[peak + 1])
+        denominator = y0 - 2.0 * y1 + y2
+        scale = max(1.0, abs(y0), abs(y1), abs(y2))
+        if not np.isfinite(denominator) or abs(denominator) <= np.finfo(float).eps * scale:
+            refined_times.append(float(time[peak]))
+            continue
+
+        delta = 0.5 * (y0 - y2) / denominator
+        if not np.isfinite(delta) or abs(delta) > 1.0:
+            refined_times.append(float(time[peak]))
+            continue
+
+        refined_times.append(float((peak + delta) / sample_rate))
+
+    return np.asarray(refined_times, dtype=float)

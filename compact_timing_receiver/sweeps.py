@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -70,6 +70,7 @@ def run_white_noise_snr_sweep(
     off_grid: bool = False,
     estimator_threshold: float | None = 0.2,
     estimator_refractory: float | None = 0.01,
+    estimator_interpolation: Literal["none", "parabolic"] = "none",
     match_tolerance: float | None = None,
 ) -> list[dict[str, Any]]:
     """Run matched-filter timing recovery across white-noise SNR levels."""
@@ -144,6 +145,7 @@ def run_white_noise_snr_sweep(
                 pulse_width=pulse_width,
                 threshold=estimator_threshold,
                 refractory=estimator_refractory,
+                interpolation=estimator_interpolation,
             )
             timing_errors, missed_count, extra_count = compute_timing_errors(
                 true_arrival_times,

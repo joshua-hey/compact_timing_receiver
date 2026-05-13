@@ -41,6 +41,5 @@ False detections are reported as an empirical extra-detection rate per resolutio
 | H1 | diagnostic peak interpolation grid 10x | 0.2151 | 0.03651 | RMSE dropped with finer diagnostic interpolation. |
 | H1 | diagnostic peak interpolation grid 100x | 0.2151 | 0.008479 | RMSE dropped with finer diagnostic interpolation. |
 | H2 | SNR convention only | 0.2151 | 0.2151 | This changes CRLB scaling, not estimator RMSE. |
-| H3 | diagnostic template oversample 10x | 0.2151 | 0.2151 | RMSE did not materially drop with a 10x oversampled diagnostic template. |
 
 Conclusion: The high-SNR floor is dominated by sample-grid peak picking.

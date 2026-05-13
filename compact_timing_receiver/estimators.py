@@ -9,7 +9,12 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
-from scipy.signal import correlate, find_peaks
+
+from compact_timing_receiver._matched_filter import (
+    find_matched_filter_peaks,
+    matched_filter_response,
+    parabolic_peak_offset_samples,
+)
 
 # Convert values to a finite one-dimensional float array.
 def _as_1d_float_array(name: str, values: np.ndarray) -> np.ndarray:
@@ -35,6 +40,20 @@ def _validate_time_signal(t: np.ndarray, signal: np.ndarray) -> tuple[np.ndarray
 # Estimate the sample spacing from the time array.
 def _sample_interval(t: np.ndarray) -> float:
     return float(np.median(np.diff(t)))
+
+
+def _validate_uniform_sampling(t: np.ndarray) -> float:
+    intervals = np.diff(t)
+    dt = _sample_interval(t)
+    absolute_tolerance = 16.0 * np.finfo(float).eps * max(
+        1.0,
+        abs(float(t[0])),
+        abs(float(t[-1])),
+    )
+    if not np.allclose(intervals, dt, rtol=1e-6, atol=absolute_tolerance):
+        raise ValueError("t must be uniformly sampled")
+    return dt
+
 
 # Detects when a signal crosses upward through a fixed threshold.
 def estimate_toa_threshold(
@@ -99,23 +118,10 @@ def estimate_toa_matched_filter(
     if interpolation not in {"none", "parabolic"}:
         raise ValueError('interpolation must be "none" or "parabolic"')
 
-    dt = _sample_interval(time)
-    sigma = pulse_width / 6.0
-    half_samples = max(1, int(np.ceil(3.0 * sigma / dt)))
-    offsets = np.arange(-half_samples, half_samples + 1, dtype=float) * dt
-
-    # Build a Gaussian template for the expected pulse shape, centered at zero and normalized to unit energy.
-    template = np.exp(-0.5 * (offsets / sigma) ** 2)
-    template -= np.mean(template)
-    norm = np.linalg.norm(template)
-    if norm == 0.0:
-        raise ValueError("pulse_width is too small for the sampling interval")
-    template /= norm
-
-    # Correlate the signal with the Gaussian template.
+    dt = _validate_uniform_sampling(time)
+    # Correlate the signal with the Gaussian matched-filter template.
     # Peaks in the filtered output occur where the signal best matches the expected pulse shape.
-    centered = samples - np.median(samples)
-    filtered = correlate(centered, template, mode="same")
+    filtered = matched_filter_response(samples, 1.0 / dt, pulse_width)
 
     # If threshold is not specified, calculate a robust threshold based on the median
     # and median absolute deviation of the filtered signal.
@@ -135,39 +141,23 @@ def estimate_toa_matched_filter(
     if refractory is None:
         refractory = 2.0 * pulse_width
 
-    # Convert refractory time from seconds to samples.
-    distance = max(1, int(round(refractory / dt)))
-
     # Find likely pulse centers by detecting peaks in the filtered signal that exceed 
     # the calculated threshold, ensuring that detected peaks are separated by at 
     # least the refractory period to avoid multiple detections of the same pulse.
-    peaks, _ = find_peaks(filtered, height=peak_threshold, distance=distance)
+    peaks = find_matched_filter_peaks(filtered, peak_threshold, refractory, 1.0 / dt)
 
     # Return array of times corresponding to the detected peaks.
     if interpolation == "none":
         return time[peaks].astype(float, copy=True)
 
-    sample_rate = 1.0 / dt
     refined_times: list[float] = []
     for peak in peaks:
-        if peak == 0 or peak == filtered.size - 1:
-            refined_times.append(float(time[peak]))
-            continue
-
-        y0 = float(filtered[peak - 1])
-        y1 = float(filtered[peak])
-        y2 = float(filtered[peak + 1])
-        denominator = y0 - 2.0 * y1 + y2
-        scale = max(1.0, abs(y0), abs(y1), abs(y2))
-        if not np.isfinite(denominator) or abs(denominator) <= np.finfo(float).eps * scale:
-            refined_times.append(float(time[peak]))
-            continue
-
-        delta = 0.5 * (y0 - y2) / denominator
-        if not np.isfinite(delta) or abs(delta) > 1.0:
-            refined_times.append(float(time[peak]))
-            continue
-
-        refined_times.append(float((peak + delta) / sample_rate))
+        delta = parabolic_peak_offset_samples(
+            filtered,
+            peak,
+            out_of_bounds="zero",
+            use_flat_tolerance=True,
+        )
+        refined_times.append(float(time[peak] + delta * dt))
 
     return np.asarray(refined_times, dtype=float)

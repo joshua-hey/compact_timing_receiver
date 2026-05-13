@@ -383,6 +383,21 @@ def test_white_noise_snr_sweep_rejects_nonpositive_pulse_count(
         run_white_noise_snr_sweep([40.0], pulse_count=pulse_count)
 
 
+def test_white_noise_snr_sweep_rejects_zero_amplitude() -> None:
+    with pytest.raises(ValueError, match="amplitude"):
+        run_white_noise_snr_sweep([40.0], amplitude=0.0)
+
+
+def test_white_noise_snr_sweep_rejects_duration_with_no_true_pulses() -> None:
+    with pytest.raises(ValueError, match="no true pulse arrivals"):
+        run_white_noise_snr_sweep(
+            [40.0],
+            sample_rate=10_000,
+            duration=0.001,
+            pulse_rate=50,
+        )
+
+
 @pytest.mark.parametrize("snr_db", [float("nan"), float("inf")])
 def test_white_noise_snr_sweep_rejects_nonfinite_snr(snr_db: float) -> None:
     with pytest.raises(ValueError):

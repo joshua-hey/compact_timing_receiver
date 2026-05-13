@@ -80,8 +80,20 @@ def run_white_noise_snr_sweep(
         raise ValueError("trial_count must be at least 1")
     if pulse_count < 1:
         raise ValueError("pulse_count must be at least 1")
+    if sample_rate <= 0.0 or not np.isfinite(sample_rate):
+        raise ValueError("sample_rate must be finite and positive")
+    if pulse_rate <= 0.0 or not np.isfinite(pulse_rate):
+        raise ValueError("pulse_rate must be finite and positive")
+    if pulse_width <= 0.0 or not np.isfinite(pulse_width):
+        raise ValueError("pulse_width must be finite and positive")
+    if not np.isfinite(amplitude):
+        raise ValueError("amplitude must be finite")
+    if amplitude == 0.0:
+        raise ValueError("amplitude must be non-zero for SNR sweeps")
     if duration is None:
         duration = (pulse_count + 1) / pulse_rate
+    if duration <= 0.0 or not np.isfinite(duration):
+        raise ValueError("duration must be finite and positive")
     if match_tolerance is None:
         match_tolerance = 3.0 / sample_rate
 
@@ -125,8 +137,12 @@ def run_white_noise_snr_sweep(
                 clock_offset=clock_offset,
                 seed=trial_seed,
             )
+            if true_arrival_times.size == 0:
+                raise ValueError("sweep configuration produced no true pulse arrivals")
             # SNR uses full-waveform average signal power, including any baseline.
             signal_power = float(np.mean(clean_signal**2))
+            if signal_power <= 0.0 or not np.isfinite(signal_power):
+                raise ValueError("clean signal power must be finite and positive")
             noise_power = signal_power / (10.0 ** (float(snr_db) / 10.0))
             noise_std = float(np.sqrt(noise_power))
             noisy_signal = add_white_noise(clean_signal, std=noise_std, seed=trial_seed)

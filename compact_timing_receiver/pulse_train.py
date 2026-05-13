@@ -60,6 +60,8 @@ def _validate_generate_args(
         raise ValueError("pulse_rate must be positive")
     if pulse_width <= 0.0:
         raise ValueError("pulse_width must be positive")
+    if clock_drift <= -1.0:
+        raise ValueError("clock_drift must be greater than -1")
     if jitter < 0.0:
         raise ValueError("jitter must be non-negative")
     if not 0.0 <= dropout <= 1.0:

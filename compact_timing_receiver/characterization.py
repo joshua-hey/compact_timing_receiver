@@ -8,11 +8,11 @@ from typing import Any
 
 import matplotlib
 import numpy as np
-from scipy.signal import find_peaks
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from compact_timing_receiver._matched_filter import find_matched_filter_peaks
 from compact_timing_receiver.crlb import (
     compute_rms_bandwidth_hz,
     estimate_matched_filter_times_diagnostic,
@@ -132,7 +132,6 @@ def diagnostic_rmse_samples(
     refractory: float,
     off_grid: bool,
     interpolation_factor: int = 1,
-    template_oversample: int = 1,
 ) -> float:
     duration = (pulse_count + 1) / pulse_rate
     sample_period = 1.0 / sample_rate
@@ -164,7 +163,6 @@ def diagnostic_rmse_samples(
             threshold=threshold,
             refractory=refractory,
             interpolation_factor=interpolation_factor,
-            template_oversample=template_oversample,
         )
         timing_errors, _, _ = compute_timing_errors(
             true_arrival_times,
@@ -226,14 +224,13 @@ def roc_at_snr(
     thresholds = np.linspace(0.0, max_response, threshold_count)
     detection_rates: list[float] = []
     false_rates: list[float] = []
-    distance = max(1, int(round(refractory * sample_rate)))
 
     for threshold in thresholds:
         detected = 0
         total_true = 0
         extra = 0
         for t, response, true_arrival_times in trial_data:
-            peaks, _ = find_peaks(response, height=threshold, distance=distance)
+            peaks = find_matched_filter_peaks(response, threshold, refractory, sample_rate)
             estimates = t[peaks].astype(float, copy=True)
             timing_errors, missed_count, extra_count = compute_timing_errors(
                 true_arrival_times,

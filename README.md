@@ -85,12 +85,28 @@ Generate the current characterization artifacts:
 python examples/crlb_characterization.py
 ```
 
-This writes the current baseline artifacts in the repository root:
+This writes generated artifacts to `artifacts/` by default:
 
 - `snr_sweep_characterization.csv`: SNR sweep metrics, confidence intervals, CRLB samples, and estimator efficiency
 - `crlb_overlay.png`: empirical timing-error overlay against the CRLB curve
 - `roc_0db.png`: empirical ROC-style detection/false-detection curve at 0 dB input SNR
 - `floor_diagnosis.md`: notes on SNR convention, detector thresholding, and high-SNR error-floor diagnostics
+
+To intentionally refresh the tracked baseline artifacts in the repository root,
+run:
+
+```bash
+python examples/crlb_characterization.py --output-dir .
+```
+
+Compare sample-grid and parabolic matched-filter timing:
+
+```bash
+python examples/interpolation_characterization.py
+```
+
+This writes interpolation comparison artifacts to `artifacts/` by default. Use
+`--output-dir .` only when intentionally refreshing the tracked baseline files.
 
 ## Tests
 

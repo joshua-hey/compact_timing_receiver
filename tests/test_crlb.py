@@ -6,8 +6,10 @@ from compact_timing_receiver.crlb import (
     compute_rms_bandwidth_hz,
     estimate_matched_filter_times_diagnostic,
     estimate_post_correlation_snr_linear,
+    matched_filter_template,
     sigma_crlb_seconds,
 )
+from compact_timing_receiver.estimators import estimate_toa_matched_filter
 from compact_timing_receiver.pulse_train import generate_pulse_train
 
 
@@ -16,6 +18,13 @@ def test_compute_rms_bandwidth_is_positive() -> None:
 
     assert math.isfinite(beta_rms_hz)
     assert beta_rms_hz > 0.0
+
+
+def test_matched_filter_template_is_centered_and_unit_energy() -> None:
+    template = matched_filter_template(10_000, 0.0012)
+
+    np.testing.assert_allclose(np.mean(template), 0.0, atol=1e-15)
+    np.testing.assert_allclose(np.linalg.norm(template), 1.0, atol=1e-15)
 
 
 def test_crlb_sigma_decreases_with_snr() -> None:
@@ -68,3 +77,31 @@ def test_diagnostic_matched_filter_estimator_returns_numpy_array() -> None:
 
     assert isinstance(estimates, np.ndarray)
     assert estimates.size > 0
+
+
+def test_diagnostic_matched_filter_matches_estimator_without_interpolation() -> None:
+    t, clean_signal, _ = generate_pulse_train(
+        sample_rate=10_000,
+        duration=0.3,
+        pulse_rate=20,
+        pulse_width=0.0012,
+        seed=1,
+    )
+
+    diagnostic_estimates = estimate_matched_filter_times_diagnostic(
+        t,
+        clean_signal,
+        pulse_width=0.0012,
+        threshold=0.2,
+        refractory=0.01,
+    )
+    estimator_estimates = estimate_toa_matched_filter(
+        t,
+        clean_signal,
+        pulse_width=0.0012,
+        threshold=0.2,
+        refractory=0.01,
+        interpolation="none",
+    )
+
+    np.testing.assert_array_equal(diagnostic_estimates, estimator_estimates)

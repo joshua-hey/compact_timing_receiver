@@ -85,6 +85,41 @@ def test_matched_filter_estimator_recovers_clean_pulse_times_with_auto_threshold
     assert np.max(_nearest_errors(estimates, true_arrivals)) <= 1.0 / 100_000
 
 
+def test_threshold_estimator_allows_nonuniform_time_axis() -> None:
+    t = np.array([0.0, 0.001, 0.003])
+    signal = np.array([0.0, 1.0, 0.0])
+
+    estimates = estimate_toa_threshold(
+        t,
+        signal,
+        threshold=0.5,
+        refractory=0.0,
+    )
+
+    np.testing.assert_allclose(estimates, np.array([0.0005]))
+
+
+def test_matched_filter_estimator_rejects_nonuniform_time_axis() -> None:
+    t, signal, _ = generate_pulse_train(
+        sample_rate=10_000,
+        duration=0.12,
+        pulse_rate=50,
+        pulse_width=0.0012,
+        amplitude=1.0,
+    )
+    nonuniform_t = t.copy()
+    nonuniform_t[1::2] += 1e-7
+
+    with pytest.raises(ValueError, match="uniformly sampled"):
+        estimate_toa_matched_filter(
+            nonuniform_t,
+            signal,
+            pulse_width=0.0012,
+            threshold=0.2,
+            refractory=0.01,
+        )
+
+
 def test_matched_filter_default_interpolation_stays_on_sample_grid() -> None:
     sample_rate = 10_000
     t, signal, _ = generate_pulse_train(
@@ -160,6 +195,44 @@ def test_matched_filter_parabolic_interpolation_returns_finite_toas() -> None:
 
     assert estimates.size > 0
     assert np.all(np.isfinite(estimates))
+
+
+def test_matched_filter_parabolic_interpolation_preserves_time_origin() -> None:
+    sample_rate = 10_000
+    t, signal, _ = generate_pulse_train(
+        sample_rate=sample_rate,
+        duration=0.22,
+        pulse_rate=50,
+        pulse_width=0.0012,
+        amplitude=1.0,
+        clock_offset=0.37 / sample_rate,
+        seed=21,
+    )
+
+    unshifted_estimates = estimate_toa_matched_filter(
+        t,
+        signal,
+        pulse_width=0.0012,
+        threshold=0.2,
+        refractory=0.01,
+        interpolation="parabolic",
+    )
+    time_origin = 1.25
+    shifted_estimates = estimate_toa_matched_filter(
+        t + time_origin,
+        signal,
+        pulse_width=0.0012,
+        threshold=0.2,
+        refractory=0.01,
+        interpolation="parabolic",
+    )
+
+    np.testing.assert_allclose(
+        shifted_estimates,
+        unshifted_estimates + time_origin,
+        rtol=0.0,
+        atol=1e-7,
+    )
 
 
 def test_matched_filter_parabolic_interpolation_reduces_high_snr_off_grid_rmse() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -181,11 +182,38 @@ def _write_report(rows: list[dict[str, float]], path: Path) -> str:
     return conclusion
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("artifacts"),
+        help="Output directory relative to the repository root unless absolute.",
+    )
+    return parser.parse_args()
+
+
+def _resolve_output_dir(repo_root: Path, output_dir: Path) -> Path:
+    if output_dir.is_absolute():
+        return output_dir
+    return repo_root / output_dir
+
+
+def _display_path(path: Path, repo_root: Path) -> str:
+    try:
+        return str(path.relative_to(repo_root))
+    except ValueError:
+        return str(path)
+
+
 def main() -> None:
+    args = _parse_args()
     repo_root = Path(__file__).resolve().parents[1]
-    csv_path = repo_root / "interpolation_characterization.csv"
-    plot_path = repo_root / "interpolation_crlb_overlay.png"
-    report_path = repo_root / "interpolation_diagnosis.md"
+    output_dir = _resolve_output_dir(repo_root, args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = output_dir / "interpolation_characterization.csv"
+    plot_path = output_dir / "interpolation_crlb_overlay.png"
+    report_path = output_dir / "interpolation_diagnosis.md"
 
     rows = _comparison_rows()
     write_sweep_csv(rows, csv_path)
@@ -195,9 +223,9 @@ def main() -> None:
     print("Interpolation characterization")
     print(f"seed: {BASE_SEED}")
     print("modes: none, parabolic")
-    print(f"wrote: {csv_path.name}")
-    print(f"wrote: {plot_path.name}")
-    print(f"wrote: {report_path.name}")
+    print(f"wrote: {_display_path(csv_path, repo_root)}")
+    print(f"wrote: {_display_path(plot_path, repo_root)}")
+    print(f"wrote: {_display_path(report_path, repo_root)}")
     print(f"conclusion: {conclusion}")
 
 

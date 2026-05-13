@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import correlate, find_peaks
+
+from compact_timing_receiver._matched_filter import (
+    find_matched_filter_peaks,
+    matched_filter_response as _matched_filter_response,
+    matched_filter_template as _matched_filter_template,
+    parabolic_peak_offset_samples,
+    pulse_template_samples as _pulse_template_samples,
+)
 
 
 def pulse_template_samples(
@@ -12,12 +19,7 @@ def pulse_template_samples(
     *,
     oversample: int = 1,
 ) -> tuple[np.ndarray, np.ndarray]:
-    effective_rate = sample_rate * oversample
-    sigma = pulse_width / 6.0
-    half_samples = max(1, int(np.ceil(3.0 * sigma * effective_rate)))
-    offsets = np.arange(-half_samples, half_samples + 1, dtype=float) / effective_rate
-    template = np.exp(-0.5 * (offsets / sigma) ** 2)
-    return offsets, template
+    return _pulse_template_samples(sample_rate, pulse_width, oversample=oversample)
 
 
 def compute_rms_bandwidth_hz(
@@ -47,45 +49,16 @@ def sigma_crlb_seconds(beta_rms_hz: float, snr_linear: float) -> float:
 def matched_filter_template(
     sample_rate: float,
     pulse_width: float,
-    *,
-    template_oversample: int = 1,
 ) -> np.ndarray:
-    _, oversampled = pulse_template_samples(
-        sample_rate,
-        pulse_width,
-        oversample=template_oversample,
-    )
-    if template_oversample > 1:
-        center = oversampled.size // 2
-        half_samples = max(1, int(np.ceil(0.5 * (oversampled.size - 1) / template_oversample)))
-        indices = center + np.arange(-half_samples, half_samples + 1) * template_oversample
-        indices = indices[(indices >= 0) & (indices < oversampled.size)]
-        template = oversampled[indices]
-    else:
-        template = oversampled
-
-    template = template.astype(float, copy=True)
-    template -= np.mean(template)
-    norm = np.linalg.norm(template)
-    if norm == 0.0:
-        raise ValueError("pulse_width is too small for the sampling interval")
-    return template / norm
+    return _matched_filter_template(sample_rate, pulse_width)
 
 
 def matched_filter_response(
     signal: np.ndarray,
     sample_rate: float,
     pulse_width: float,
-    *,
-    template_oversample: int = 1,
 ) -> np.ndarray:
-    template = matched_filter_template(
-        sample_rate,
-        pulse_width,
-        template_oversample=template_oversample,
-    )
-    centered = np.asarray(signal, dtype=float) - np.median(signal)
-    return correlate(centered, template, mode="same")
+    return _matched_filter_response(signal, sample_rate, pulse_width)
 
 
 def estimate_post_correlation_snr_linear(
@@ -116,17 +89,10 @@ def estimate_matched_filter_times_diagnostic(
     threshold: float,
     refractory: float,
     interpolation_factor: int = 1,
-    template_oversample: int = 1,
 ) -> np.ndarray:
     sample_rate = 1.0 / float(np.median(np.diff(t)))
-    response = matched_filter_response(
-        signal,
-        sample_rate,
-        pulse_width,
-        template_oversample=template_oversample,
-    )
-    distance = max(1, int(round(refractory * sample_rate)))
-    peaks, _ = find_peaks(response, height=threshold, distance=distance)
+    response = matched_filter_response(signal, sample_rate, pulse_width)
+    peaks = find_matched_filter_peaks(response, threshold, refractory, sample_rate)
 
     if interpolation_factor <= 1:
         return t[peaks].astype(float, copy=True)
@@ -134,19 +100,12 @@ def estimate_matched_filter_times_diagnostic(
     dt = 1.0 / sample_rate
     refined: list[float] = []
     for peak in peaks:
-        if peak == 0 or peak == response.size - 1:
-            refined.append(float(t[peak]))
-            continue
-
-        y0 = response[peak - 1]
-        y1 = response[peak]
-        y2 = response[peak + 1]
-        denominator = y0 - 2.0 * y1 + y2
-        if denominator == 0.0:
-            offset_samples = 0.0
-        else:
-            offset_samples = 0.5 * (y0 - y2) / denominator
-            offset_samples = float(np.clip(offset_samples, -1.0, 1.0))
+        offset_samples = parabolic_peak_offset_samples(
+            response,
+            peak,
+            out_of_bounds="clip",
+            use_flat_tolerance=False,
+        )
         offset_samples = round(offset_samples * interpolation_factor) / interpolation_factor
         refined.append(float(t[peak] + offset_samples * dt))
 

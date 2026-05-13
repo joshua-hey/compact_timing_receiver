@@ -37,6 +37,9 @@ def test_pulse_generator_validates_arguments() -> None:
     with pytest.raises(ValueError):
         generate_pulse_train(10_000, 0.1, 50, 0.001, dropout=1.5)
 
+    with pytest.raises(ValueError, match="clock_drift"):
+        generate_pulse_train(10_000, 0.1, 50, 0.001, clock_drift=-1.0)
+
 
 def test_generate_pulse_train_clock_offset_shifts_all_arrivals() -> None:
     _, _, nominal_arrivals = generate_pulse_train(

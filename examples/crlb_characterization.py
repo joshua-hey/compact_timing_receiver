@@ -1,5 +1,6 @@
 """Generate CRLB overlay artifacts and floor diagnostics."""
 
+import argparse
 import math
 import sys
 from pathlib import Path
@@ -82,12 +83,9 @@ def _characterization_rows() -> list[dict[str, object]]:
 def _conclusion(
     baseline: float,
     interpolation_100x: float,
-    oversampled_template: float,
 ) -> str:
     if math.isfinite(interpolation_100x) and interpolation_100x < 0.5 * baseline:
         return "The high-SNR floor is dominated by sample-grid peak picking."
-    if math.isfinite(oversampled_template) and oversampled_template < 0.5 * baseline:
-        return "The high-SNR floor is dominated by the discrete template representation."
     return "The high-SNR floor is not explained by the tested single-parameter diagnostics."
 
 
@@ -98,11 +96,10 @@ def _write_report(
     h1_baseline: float,
     h1_10x: float,
     h1_100x: float,
-    h3_10x: float,
     snr_diagnostics: list[dict[str, float]],
     cells_per_trial: int,
 ) -> str:
-    conclusion = _conclusion(h1_baseline, h1_100x, h3_10x)
+    conclusion = _conclusion(h1_baseline, h1_100x)
     lines = [
         "# Floor Diagnosis",
         "",
@@ -133,11 +130,6 @@ def _write_report(
         if math.isfinite(h1_100x) and h1_100x < 0.5 * h1_baseline
         else "RMSE did not materially drop with finer diagnostic interpolation."
     )
-    h3_conclusion = (
-        "RMSE dropped with a 10x oversampled diagnostic template."
-        if math.isfinite(h3_10x) and h3_10x < 0.5 * h1_baseline
-        else "RMSE did not materially drop with a 10x oversampled diagnostic template."
-    )
 
     lines.extend(
         [
@@ -149,7 +141,6 @@ def _write_report(
             f"| H1 | diagnostic peak interpolation grid 10x | {h1_baseline:.4g} | {h1_10x:.4g} | {h1_conclusion} |",
             f"| H1 | diagnostic peak interpolation grid 100x | {h1_baseline:.4g} | {h1_100x:.4g} | {h1_conclusion} |",
             f"| H2 | SNR convention only | {h1_baseline:.4g} | {h1_baseline:.4g} | This changes CRLB scaling, not estimator RMSE. |",
-            f"| H3 | diagnostic template oversample 10x | {h1_baseline:.4g} | {h3_10x:.4g} | {h3_conclusion} |",
             "",
             f"Conclusion: {conclusion}",
             "",
@@ -159,12 +150,39 @@ def _write_report(
     return conclusion
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("artifacts"),
+        help="Output directory relative to the repository root unless absolute.",
+    )
+    return parser.parse_args()
+
+
+def _resolve_output_dir(repo_root: Path, output_dir: Path) -> Path:
+    if output_dir.is_absolute():
+        return output_dir
+    return repo_root / output_dir
+
+
+def _display_path(path: Path, repo_root: Path) -> str:
+    try:
+        return str(path.relative_to(repo_root))
+    except ValueError:
+        return str(path)
+
+
 def main() -> None:
+    args = _parse_args()
     repo_root = Path(__file__).resolve().parents[1]
-    csv_path = repo_root / "snr_sweep_characterization.csv"
-    crlb_plot_path = repo_root / "crlb_overlay.png"
-    roc_plot_path = repo_root / "roc_0db.png"
-    report_path = repo_root / "floor_diagnosis.md"
+    output_dir = _resolve_output_dir(repo_root, args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = output_dir / "snr_sweep_characterization.csv"
+    crlb_plot_path = output_dir / "crlb_overlay.png"
+    roc_plot_path = output_dir / "roc_0db.png"
+    report_path = output_dir / "floor_diagnosis.md"
 
     print("CRLB characterization")
     print(f"seed: {BASE_SEED}")
@@ -237,21 +255,6 @@ def main() -> None:
         off_grid=OFF_GRID,
         interpolation_factor=100,
     )
-    h3_10x = diagnostic_rmse_samples(
-        snr_db=30.0,
-        trial_count=PILOT_TRIAL_COUNT,
-        pulse_count=PULSE_COUNT,
-        base_seed=BASE_SEED,
-        sample_rate=SAMPLE_RATE,
-        pulse_rate=PULSE_RATE,
-        pulse_width=PULSE_WIDTH,
-        amplitude=AMPLITUDE,
-        threshold=THRESHOLD,
-        refractory=REFRACTORY,
-        off_grid=OFF_GRID,
-        template_oversample=10,
-    )
-
     _, detection_rates, false_rates, cells_per_trial = roc_at_snr(
         snr_db=0.0,
         trial_count=PILOT_TRIAL_COUNT,
@@ -272,16 +275,15 @@ def main() -> None:
         h1_baseline=h1_baseline,
         h1_10x=h1_10x,
         h1_100x=h1_100x,
-        h3_10x=h3_10x,
         snr_diagnostics=snr_diagnostics,
         cells_per_trial=cells_per_trial,
     )
 
     print(f"beta_rms_hz: {beta_rms_hz:.6g}")
-    print(f"wrote: {csv_path.name}")
-    print(f"wrote: {crlb_plot_path.name}")
-    print(f"wrote: {roc_plot_path.name}")
-    print(f"wrote: {report_path.name}")
+    print(f"wrote: {_display_path(csv_path, repo_root)}")
+    print(f"wrote: {_display_path(crlb_plot_path, repo_root)}")
+    print(f"wrote: {_display_path(roc_plot_path, repo_root)}")
+    print(f"wrote: {_display_path(report_path, repo_root)}")
     print(f"conclusion: {conclusion}")
 
 

@@ -14,7 +14,7 @@ This repository is public as an early prototype. The current code is intentional
 - Matched-filter time-of-arrival estimation
 - Detection and timing-error metrics for estimator comparisons
 - White-noise SNR sweeps with empirical detection, false-detection, and error summaries
-- CRLB overlay, ROC, and high-SNR error-floor diagnostic artifacts
+- CRLB efficiency, detection tradeoff, and high-SNR error-floor diagnostic artifacts
 - Unit tests for the simulator, estimators, metrics, sweeps, and characterization helpers
 
 Future phases may expand the receiver model, add more realistic impairments, and introduce hardware-facing workflows.
@@ -88,16 +88,7 @@ python examples/crlb_characterization.py
 This writes generated artifacts to `artifacts/` by default:
 
 - `snr_sweep_characterization.csv`: SNR sweep metrics, confidence intervals, CRLB samples, and estimator efficiency
-- `crlb_overlay.png`: empirical timing-error overlay against the CRLB curve
-- `roc_0db.png`: empirical ROC-style detection/false-detection curve at 0 dB input SNR
 - `floor_diagnosis.md`: notes on SNR convention, detector thresholding, and high-SNR error-floor diagnostics
-
-To intentionally refresh the tracked baseline artifacts in the repository root,
-run:
-
-```bash
-python examples/crlb_characterization.py --output-dir .
-```
 
 Compare sample-grid and parabolic matched-filter timing:
 
@@ -105,8 +96,21 @@ Compare sample-grid and parabolic matched-filter timing:
 python examples/interpolation_characterization.py
 ```
 
-This writes interpolation comparison artifacts to `artifacts/` by default. Use
-`--output-dir .` only when intentionally refreshing the tracked baseline files.
+This writes interpolation comparison artifacts to `artifacts/` by default.
+
+Generate explanatory matched-filter visualizations:
+
+```bash
+python examples/matched_filter_visualizations.py
+```
+
+This writes:
+
+- `matched_filter_peak_anatomy.png`: one-pulse correlation peak, sample-grid peak, parabolic vertex, and true center
+- `matched_filter_fractional_offset_error_heatmap.png`: signed timing error vs fractional sample offset and SNR
+- `matched_filter_crlb_efficiency.png`: RMSE/CRLB efficiency vs SNR with 1x and 2x reference lines
+- `matched_filter_absolute_error_cdf.png`: absolute matched-error CDFs at selected SNRs
+- `matched_filter_detection_tradeoff.png`: ROC-style detection/false-alarm tradeoff with the fixed threshold marked
 
 ## Tests
 

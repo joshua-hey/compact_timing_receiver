@@ -1,23 +1,18 @@
-"""Generate CRLB overlay artifacts and floor diagnostics."""
+"""Generate CRLB characterization data and floor diagnostics."""
 
 import argparse
 import math
 import sys
 from pathlib import Path
 
-import numpy as np
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from compact_timing_receiver.characterization import (
     diagnostic_rmse_samples,
     one_trial_snr_diagnostics,
-    plot_crlb_overlay,
-    plot_roc,
-    roc_at_snr,
     write_sweep_csv,
 )
-from compact_timing_receiver.crlb import compute_rms_bandwidth_hz
+from compact_timing_receiver.crlb import compute_rms_bandwidth_hz, resolution_cell_count
 from compact_timing_receiver.sweeps import run_white_noise_snr_sweep
 
 
@@ -80,6 +75,10 @@ def _characterization_rows() -> list[dict[str, object]]:
     return final_rows
 
 
+def _sample_count() -> int:
+    return int(math.floor(((PULSE_COUNT + 1) / PULSE_RATE) * SAMPLE_RATE))
+
+
 def _conclusion(
     baseline: float,
     interpolation_100x: float,
@@ -107,11 +106,11 @@ def _write_report(
         "",
         f"Beta RMS: `{beta_rms_hz:.6g}` Hz, computed numerically from the sampled Gaussian pulse template used by the simulator.",
         "",
-        "SNR convention: the sweep input SNR is full-waveform average signal power divided by AWGN sample noise power. The CRLB overlay uses the estimated post-correlation peak SNR from the matched-filter response.",
+        "SNR convention: the sweep input SNR is full-waveform average signal power divided by AWGN sample noise power. CRLB diagnostics use the estimated post-correlation peak SNR from the matched-filter response.",
         "",
         f"Detection threshold rule: fixed matched-filter correlation-height threshold `{THRESHOLD}` with `find_peaks` distance `{REFRACTORY}` seconds. This is not CFAR and is not a fixed-Pfa detector.",
         "",
-        f"Search window length: `{int(round(((PULSE_COUNT + 1) / PULSE_RATE) * SAMPLE_RATE))}` samples. Resolution cells per trial: `{cells_per_trial}`.",
+        f"Search window length: `{_sample_count()}` samples. Resolution cells per trial: `{cells_per_trial}`.",
         "",
         "False detections are reported as an empirical extra-detection rate per resolution cell or per 100 true pulses, not as formal Pfa.",
         "",
@@ -180,8 +179,6 @@ def main() -> None:
     output_dir = _resolve_output_dir(repo_root, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "snr_sweep_characterization.csv"
-    crlb_plot_path = output_dir / "crlb_overlay.png"
-    roc_plot_path = output_dir / "roc_0db.png"
     report_path = output_dir / "floor_diagnosis.md"
 
     print("CRLB characterization")
@@ -191,7 +188,6 @@ def main() -> None:
     rows = _characterization_rows()
     beta_rms_hz = compute_rms_bandwidth_hz(SAMPLE_RATE, PULSE_WIDTH)
     write_sweep_csv(rows, csv_path)
-    plot_crlb_overlay(rows, crlb_plot_path)
 
     snr_diagnostics = one_trial_snr_diagnostics(
         SNR_DB_VALUES,
@@ -255,19 +251,7 @@ def main() -> None:
         off_grid=OFF_GRID,
         interpolation_factor=100,
     )
-    _, detection_rates, false_rates, cells_per_trial = roc_at_snr(
-        snr_db=0.0,
-        trial_count=PILOT_TRIAL_COUNT,
-        pulse_count=PULSE_COUNT,
-        base_seed=BASE_SEED,
-        sample_rate=SAMPLE_RATE,
-        pulse_rate=PULSE_RATE,
-        pulse_width=PULSE_WIDTH,
-        amplitude=AMPLITUDE,
-        refractory=REFRACTORY,
-        off_grid=OFF_GRID,
-    )
-    plot_roc(false_rates, detection_rates, roc_plot_path)
+    cells_per_trial = resolution_cell_count(_sample_count(), SAMPLE_RATE, REFRACTORY)
 
     conclusion = _write_report(
         report_path,
@@ -281,8 +265,6 @@ def main() -> None:
 
     print(f"beta_rms_hz: {beta_rms_hz:.6g}")
     print(f"wrote: {_display_path(csv_path, repo_root)}")
-    print(f"wrote: {_display_path(crlb_plot_path, repo_root)}")
-    print(f"wrote: {_display_path(roc_plot_path, repo_root)}")
     print(f"wrote: {_display_path(report_path, repo_root)}")
     print(f"conclusion: {conclusion}")
 
